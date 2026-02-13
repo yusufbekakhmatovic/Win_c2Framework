@@ -1,0 +1,39 @@
+# Compiled binaries
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.log
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs & temporary
+c2.log
+c2_startup.log
+
+# Build artifacts
+cd
+dir
+whoami
+updatewin
+icon.ico
+
+# Temporary scripts
+final_fix.py
